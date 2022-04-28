@@ -1,0 +1,17 @@
+
+
+    <head>
+        <title>Login page</title>
+        <meta charset="utf-8">
+        <meta name='viewport' contetn='width=device-width, initial-scale=1'>
+        <link href="{{ url_for('static', path='/styles.css') }}" rel="stylesheet">
+    </head>
+    <body>
+        <div class="placeholder"></div>
+        <form method="POST" action="/login">
+            <input type="text" name="username" placeholder="email"/>
+            <input type="password" name="password" placeholder="password"/>
+            <input class='submit-buttom' type="submit" value="Enter"/>
+        </form>
+        <div class="placeholder"></div>
+    </body>
