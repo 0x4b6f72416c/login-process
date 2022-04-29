@@ -1,0 +1,25 @@
+body{
+    background: linear-gradient(180deg, #40DFEF,#B9F8D3);
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height:100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-family: monospace;
+}
+.text-form{
+    width:230px;
+    height: 50px;
+    border: 0;
+    border-radius: 15px;
+    padding: 20px;
+    background: linear-gradient(180deg, #E78EA9,#FFFBE7);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23);
+    vertical-align: middle;
+    text-align: center;
+}
+.placeholder{
+    flex: 1;
+}

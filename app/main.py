@@ -1,6 +1,8 @@
-import email
-from fastapi import Depends, FastAPI, Request, status, Form
-from fastapi.responses import HTMLResponse
+
+from http.client import HTTPException
+from urllib import request
+from fastapi import Depends, FastAPI, Request, status, Form, Cookie
+from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -8,6 +10,9 @@ from .schemas import User
 from . import models
 from .database import engine, SessionLocal
 from app import schemas
+from passlib.context import CryptContext
+from .token import Sign
+from app import token
 
 
 def get_database():
@@ -20,22 +25,47 @@ def get_database():
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 models.Base.metadata.create_all(engine)
 
 
 
 @app.get('/', status_code=status.HTTP_200_OK ,response_class=HTMLResponse, tags=['login'])
-def index_page(request: Request):
-    return templates.TemplateResponse("index.html", {"request":request})
+def index_page(request: Request, username: str | None = Cookie(None), db: Session = Depends(get_database)):
+    if username:
+        response = Response()
+        if not username:
+            response.delete_cookie(key="username ") 
+            return templates.TemplateResponse("index.html", {"request":request})     
+        user = db.query(models.User).filter(models.User.email == username).first()
 
-@app.post('/login')
-def process_login(username: str = Form(...), password: str = Form(...)):
-    return {"username":username, "password":password}
+
+        if not user:
+            response.delete_cookie(key="username")
+            return templates.TemplateResponse("index.html", {"request":request})
+        username_sign = Sign.sign_username(user.email)
+        response.set_cookie(key="username", value=username_sign)
+        return templates.TemplateResponse('index_cookie.html',{"request":request, "username":user.email})
+    else:   
+        return templates.TemplateResponse("index.html", {"request":request}) 
+
+@app.post('/login',status_code=status.HTTP_202_ACCEPTED, tags=['authentication'])
+def process_login(username: str = Form(...), password: str = Form(...), db: Session = Depends(get_database)):
+    user = db.query(models.User).filter(models.User.email == username).first()
+    if not user:
+        raise HTTPException(status_code = status.HTTP_404_NOT_FOUND, detail = f"Invalid credentails")
+    if not pwd_context.verify(password, user.password):
+        raise HTTPException(status_code = status.HTTP_404_NOT_FOUND, detail = f"Incorrect password")
+    response = Response()
+    response.set_cookie(key="username", value=user.email)
+    return response
+
 
 @app.post('/create', status_code=status.HTTP_201_CREATED, tags=['users'])
 def create_user(request: schemas.User, db: Session = Depends(get_database)):
-    new_user = models.User(email = request.username, password = request.password)
+    hashed_password = pwd_context.hash(request.password)
+    new_user = models.User(email = request.username, password = hashed_password)
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
