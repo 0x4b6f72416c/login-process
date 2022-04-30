@@ -1,4 +1,5 @@
 
+from curses.ascii import SI
 from http.client import HTTPException
 from urllib import request
 from fastapi import Depends, FastAPI, Request, status, Form, Cookie
@@ -33,22 +34,15 @@ models.Base.metadata.create_all(engine)
 
 @app.get('/', status_code=status.HTTP_200_OK ,response_class=HTMLResponse, tags=['login'])
 def index_page(request: Request, username: str | None = Cookie(None), db: Session = Depends(get_database)):
-    if username:
-        response = Response()
-        if not username:
-            response.delete_cookie(key="username ") 
-            return templates.TemplateResponse("index.html", {"request":request})     
-        user = db.query(models.User).filter(models.User.email == username).first()
-
-
-        if not user:
-            response.delete_cookie(key="username")
-            return templates.TemplateResponse("index.html", {"request":request})
-        username_sign = Sign.sign_username(user.email)
-        response.set_cookie(key="username", value=username_sign)
-        return templates.TemplateResponse('index_cookie.html',{"request":request, "username":user.email})
-    else:   
+    if not username:
         return templates.TemplateResponse("index.html", {"request":request}) 
+    user = db.query(models.User).filter(models.User.email == Sign.get_username_from_sign(username)).first()
+    if not user:
+        return templates.TemplateResponse("index.html", {"request":request})
+    valid_username = Sign.get_username_from_sign(username)
+    if not valid_username:
+        return templates.TemplateResponse("index.html", {"request":request}) 
+    return templates.TemplateResponse('index_cookie.html',{"request":request, "username":user.email})
 
 @app.post('/login',status_code=status.HTTP_202_ACCEPTED, tags=['authentication'])
 def process_login(username: str = Form(...), password: str = Form(...), db: Session = Depends(get_database)):
@@ -58,7 +52,8 @@ def process_login(username: str = Form(...), password: str = Form(...), db: Sess
     if not pwd_context.verify(password, user.password):
         raise HTTPException(status_code = status.HTTP_404_NOT_FOUND, detail = f"Incorrect password")
     response = Response()
-    response.set_cookie(key="username", value=user.email)
+    username_sign = Sign.sign_username(username)
+    response.set_cookie(key="username", value=username_sign)
     return response
 
 
