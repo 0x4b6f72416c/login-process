@@ -1,6 +1,7 @@
 
 from curses.ascii import SI
 from http.client import HTTPException
+from multiprocessing import context
 from urllib import request
 from fastapi import Depends, FastAPI, Request, status, Form, Cookie
 from fastapi.responses import HTMLResponse, Response
@@ -38,19 +39,29 @@ def index_page(request: Request, username: str | None = Cookie(None), db: Sessio
         return templates.TemplateResponse("index.html", {"request":request}) 
     user = db.query(models.User).filter(models.User.email == Sign.get_username_from_sign(username)).first()
     if not user:
-        return templates.TemplateResponse("index.html", {"request":request})
+        content = templates.get_template("index.html")
+        response = Response(content=content)
+        response.delete_cookie()
+        return response
+
+
     valid_username = Sign.get_username_from_sign(username)
     if not valid_username:
-        return templates.TemplateResponse("index.html", {"request":request}) 
-    return templates.TemplateResponse('index_cookie.html',{"request":request, "username":user.email})
+        content = templates.get_template("index.html")
+        response = Response(content=content)
+        response.delete_cookie()
+        return response
+
+    
+    return templates.TemplateResponse('index_cookie.html',{"request":request, "username":valid_username })
 
 @app.post('/login',status_code=status.HTTP_202_ACCEPTED, tags=['authentication'])
 def process_login(username: str = Form(...), password: str = Form(...), db: Session = Depends(get_database)):
     user = db.query(models.User).filter(models.User.email == username).first()
     if not user:
-        raise HTTPException(status_code = status.HTTP_404_NOT_FOUND, detail = f"Invalid credentails")
+        raise HTTPException(status.HTTP_404_NOT_FOUND)
     if not pwd_context.verify(password, user.password):
-        raise HTTPException(status_code = status.HTTP_404_NOT_FOUND, detail = f"Incorrect password")
+        raise HTTPException(status.HTTP_404_NOT_FOUND)
     response = Response()
     username_sign = Sign.sign_username(username)
     response.set_cookie(key="username", value=username_sign)
